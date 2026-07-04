@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Diary for Apple Pencil</title>
+<style>
+  :root{
+    --bg:#f2f2f7;
+    --card:#ffffff;
+    --label:#000000;
+    --secondary:#8e8e93;
+    --tertiary:#c7c7cc;
+    --separator:rgba(60,60,67,.12);
+    --tint:#5a5a60;
+    --tint-2:#8e8e96;
+    --ink:#1c1c2e;
+    --font:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none;}
+  body{
+    font-family:var(--font);
+    background:var(--bg);
+    height:100dvh;color:var(--label);
+    user-select:none;-webkit-user-select:none;
+  }
+
+  /* ============ HOME (entry list) ============ */
+  #home{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    transition:transform .32s cubic-bezier(.32,.72,.35,1), opacity .32s;
+  }
+  #home.pushed{transform:translateX(-28%) scale(.98);opacity:.6;}
+  .home-scroll{
+    flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:0 20px calc(120px + env(safe-area-inset-bottom));
+  }
+  .large-title{
+    padding-top:calc(14px + env(safe-area-inset-top));
+    padding-bottom:12px;
+    display:flex;align-items:flex-end;justify-content:space-between;
+  }
+  .large-title h1{font-size:34px;font-weight:700;letter-spacing:.01em;}
+  .profile-dot{
+    width:34px;height:34px;border-radius:50%;
+    background:linear-gradient(135deg,var(--tint-2),var(--tint));
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:15px;font-weight:600;
+    box-shadow:0 2px 8px rgba(90,90,96,.3);
+  }
+  .streak-banner{
+    display:flex;align-items:center;gap:14px;
+    background:var(--card);border-radius:18px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+    padding:14px 16px;margin-bottom:6px;
+    animation:cardIn .35s cubic-bezier(.25,1,.4,1) both;
+  }
+  .streak-banner .flame{
+    width:46px;height:46px;border-radius:50%;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#ffb340,#ff6a3d);
+    box-shadow:0 4px 12px rgba(255,106,61,.35);
+  }
+  .streak-banner.cold .flame{
+    background:linear-gradient(135deg,#d5d5db,#b5b5bd);
+    box-shadow:none;
+  }
+  .streak-banner .flame svg{width:24px;height:24px;}
+  .streak-banner .txt .big{font-size:17px;font-weight:700;}
+  .streak-banner .txt .small{font-size:13px;color:var(--secondary);margin-top:1px;}
+  .streak-banner .badge{
+    margin-left:auto;flex:0 0 auto;
+    font-size:12px;font-weight:600;color:#34c759;
+    background:rgba(52,199,89,.12);
+    padding:5px 10px;border-radius:12px;
+  }
+  .streak-banner .badge.warn{color:#ff9500;background:rgba(255,149,0,.12);}
+  .section-label{
+    font-size:13px;font-weight:600;color:var(--secondary);
+    text-transform:uppercase;letter-spacing:.04em;
+    margin:14px 2px 8px;
+  }
+  .card{
+    background:var(--card);border-radius:18px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+    margin-bottom:12px;overflow:hidden;cursor:pointer;
+    transition:transform .12s;
+    animation:cardIn .35s cubic-bezier(.25,1,.4,1) both;
+  }
+  @keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+  .card:active{transform:scale(.98);}
+  .card .thumb{
+    width:100%;height:130px;display:block;background:#fff;
+    border-bottom:.5px solid var(--separator);
+  }
+  .card .meta{padding:12px 16px 14px;}
+  .card .meta .title{font-size:16px;font-weight:600;margin-bottom:2px;}
+  .card .meta .sub{font-size:13px;color:var(--secondary);}
+  .empty-state{
+    text-align:center;padding:70px 30px 0;color:var(--secondary);
+  }
+  .empty-state .glyph{
+    width:64px;height:64px;margin:0 auto 16px;border-radius:16px;
+    background:linear-gradient(135deg,var(--tint-2),var(--tint));
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 24px rgba(90,90,96,.3);
+  }
+  .empty-state .glyph svg{width:32px;height:32px;}
+  .empty-state h2{font-size:20px;font-weight:700;color:var(--label);margin-bottom:6px;}
+  .empty-state p{font-size:15px;line-height:1.45;}
+
+  .fab-wrap{
+    position:absolute;left:0;right:0;bottom:calc(24px + env(safe-area-inset-bottom));
+    display:flex;justify-content:center;pointer-events:none;z-index:5;
+  }
+  .fab{
+    pointer-events:auto;
+    width:58px;height:58px;border-radius:50%;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--tint-2),var(--tint));
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 20px rgba(90,90,96,.4), 0 1px 0 rgba(255,255,255,.35) inset;
+    transition:transform .12s;
+  }
+  .fab:active{transform:scale(.9);}
+  .fab svg{width:26px;height:26px;}
+
+  /* ============ EDITOR ============ */
+  #editor{
+    position:absolute;inset:0;z-index:10;
+    display:flex;flex-direction:column;
+    background:var(--bg);
+    transform:translateX(100%);
+    transition:transform .32s cubic-bezier(.32,.72,.35,1);
+  }
+  #editor.open{transform:translateX(0);}
+  .navbar{
+    flex:0 0 auto;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:calc(8px + env(safe-area-inset-top)) 8px 8px;
+    background:rgba(242,242,247,.85);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-bottom:.5px solid var(--separator);
+    z-index:6;
+  }
+  .nav-btn{
+    background:none;border:none;cursor:pointer;
+    font-family:var(--font);font-size:17px;color:var(--tint);
+    padding:8px 12px;display:flex;align-items:center;gap:2px;
+    border-radius:10px;
+  }
+  .nav-btn:active{opacity:.5;}
+  .nav-btn.bold{font-weight:600;}
+  .nav-btn svg{width:12px;height:20px;}
+  .nav-title{text-align:center;line-height:1.25;}
+  .nav-title .t{font-size:16px;font-weight:600;}
+  .nav-title .s{font-size:12px;color:var(--secondary);}
+
+  .editor-body{
+    flex:1 1 auto;min-height:0;position:relative;
+    padding:14px 14px 10px;display:flex;
+  }
+  .sheet{
+    position:relative;flex:1;
+    background:#fff;border-radius:16px;
+    box-shadow:0 1px 4px rgba(0,0,0,.08);
+    overflow:hidden;
+  }
+  canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;}
+  #paperCanvas{z-index:1;}
+  #inkCanvas{z-index:2;}
+  .page-hint{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:2;text-align:center;color:var(--tertiary);pointer-events:none;
+    font-size:16px;line-height:1.6;transition:opacity .3s;
+  }
+  .page-hint.hidden{opacity:0;}
+
+  /* PencilKit-style floating palette */
+  .palette{
+    flex:0 0 auto;z-index:6;
+    margin:0 auto calc(12px + env(safe-area-inset-bottom));
+    width:min(100% - 20px, 640px);
+    background:rgba(255,255,255,.88);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border:.5px solid rgba(60,60,67,.14);
+    border-radius:22px;
+    box-shadow:0 8px 28px rgba(0,0,0,.16);
+    padding:8px 12px;
+    display:flex;align-items:center;gap:8px;
+    overflow-x:auto;scrollbar-width:none;
+  }
+  .palette::-webkit-scrollbar{display:none;}
+  .pgroup{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+  .pdivider{width:.5px;height:28px;background:rgba(60,60,67,.2);flex:0 0 auto;}
+  .ptool{
+    width:42px;height:42px;border-radius:12px;border:none;cursor:pointer;
+    background:transparent;color:#3a3a3c;
+    display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+    transition:background .15s, color .15s, transform .1s;
+  }
+  .ptool svg{width:21px;height:21px;}
+  .ptool:active{transform:scale(.9);}
+  .ptool.active{background:rgba(90,90,96,.12);color:var(--tint);}
+  .pswatch{
+    width:27px;height:27px;border-radius:50%;flex:0 0 auto;cursor:pointer;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);
+    transition:transform .12s, box-shadow .12s;
+  }
+  .pswatch.active{transform:scale(1.15);box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--tint);}
+  .psize{
+    width:38px;height:38px;border-radius:11px;border:none;cursor:pointer;
+    background:transparent;display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  }
+  .psize span{border-radius:50%;background:#3a3a3c;display:block;}
+  .psize[data-size="thin"] span{width:4px;height:4px;}
+  .psize[data-size="med"] span{width:8px;height:8px;}
+  .psize[data-size="thick"] span{width:13px;height:13px;}
+  .psize.active{background:rgba(90,90,96,.12);}
+  .psize.active span{background:var(--tint);}
+  .ptoggle{
+    display:flex;align-items:center;gap:7px;flex:0 0 auto;cursor:pointer;
+    font-size:11px;font-weight:600;color:var(--secondary);line-height:1.3;
+    padding:4px 6px;
+  }
+  .ptoggle .pill{
+    width:40px;height:24px;border-radius:12px;background:rgba(120,120,128,.28);
+    position:relative;transition:background .2s;flex:0 0 auto;
+  }
+  .ptoggle .pill::after{
+    content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;
+    background:#fff;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,.2);
+  }
+  .ptoggle.on .pill{background:#34c759;}
+  .ptoggle.on .pill::after{left:18px;}
+
+  /* toast */
+  #toast{
+    position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));
+    transform:translate(-50%,-8px);
+    background:rgba(28,28,30,.92);color:#fff;
+    padding:10px 20px;border-radius:20px;
+    font-size:13px;font-weight:500;
+    opacity:0;pointer-events:none;transition:all .3s;z-index:60;
+    box-shadow:0 8px 20px rgba(0,0,0,.25);
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0);}
+
+  /* delete action sheet */
+  #confirmSheet{
+    position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;
+    display:none;align-items:flex-end;justify-content:center;
+    padding:0 10px calc(10px + env(safe-area-inset-bottom));
+  }
+  #confirmSheet.open{display:flex;}
+  .action-card{width:100%;max-width:420px;}
+  .action-card .grp{background:rgba(255,255,255,.95);border-radius:14px;overflow:hidden;margin-bottom:8px;
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
+  .action-card button{
+    display:block;width:100%;padding:17px;border:none;background:none;cursor:pointer;
+    font-family:var(--font);font-size:19px;color:var(--tint);
+  }
+  .action-card button:active{background:rgba(0,0,0,.06);}
+  .action-card .destructive{color:#ff3b30;border-top:.5px solid var(--separator);}
+  .action-card .title-row{padding:12px;font-size:13px;color:var(--secondary);text-align:center;border-bottom:.5px solid var(--separator);}
+  .action-card .cancel{font-weight:600;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;animation:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<div id="home">
+  <div class="home-scroll" id="homeScroll">
+    <div class="large-title">
+      <h1>Diary <span style="font-size:15px;font-weight:600;color:var(--secondary);display:block;margin-top:2px;">for Apple Pencil</span></h1>
+      <div class="profile-dot" id="profileDot">✎</div>
+    </div>
+    <div id="streakBanner"></div>
+    <div id="cardList"></div>
+  </div>
+  <div class="fab-wrap">
+    <button class="fab" id="fabBtn" aria-label="New entry">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ============ EDITOR ============ -->
+<div id="editor">
+  <div class="navbar">
+    <button class="nav-btn" id="backBtn">
+      <svg viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L3 10l7 8"/></svg>
+      Diary
+    </button>
+    <div class="nav-title">
+      <div class="t" id="navDate">Today</div>
+      <div class="s" id="navSub"></div>
+    </div>
+    <button class="nav-btn bold" id="doneBtn">Done</button>
+  </div>
+
+  <div class="editor-body">
+    <div class="sheet" id="sheet">
+      <canvas id="paperCanvas"></canvas>
+      <canvas id="inkCanvas"></canvas>
+      <div class="page-hint" id="hint">Write something with your Apple Pencil</div>
+    </div>
+  </div>
+
+  <div class="palette">
+    <div class="pgroup" id="tools">
+      <button class="ptool active" data-tool="pen" title="Pen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 3.5l-2-.5-9 9-.9 3.4 3.4-.9 9-9-.5-2z"/><path d="M12.5 6.5l5 5"/><path d="M8 14l-4.6 5.6c-.4.5.2 1.1.7.7L9.7 16"/></svg>
+      </button>
+      <button class="ptool" data-tool="pencil" title="Pencil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4L8 20l-5 1 1-5L17 3z"/><path d="M14.5 5.5l4 4"/></svg>
+      </button>
+      <button class="ptool" data-tool="marker" title="Highlighter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l-5 5 2 2 2 2 5-5"/><path d="M9 11l7.5-7.5c.6-.6 1.6-.6 2.1 0l1.9 1.9c.6.6.6 1.6 0 2.1L13 15"/><path d="M3 21h6"/></svg>
+      </button>
+      <button class="ptool" data-tool="eraser" title="Eraser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8.5l-4.2-4.2a2 2 0 010-2.8L13.6 3.7a2 2 0 012.8 0l4 4a2 2 0 010 2.8L12 19"/><path d="M9 9l6 6"/></svg>
+      </button>
+    </div>
+    <div class="pdivider"></div>
+    <div class="pgroup" id="colors">
+      <div class="pswatch active" data-color="#111114" style="background:#111114"></div>
+      <div class="pswatch" data-color="#ff3b30" style="background:#ff3b30"></div>
+      <div class="pswatch" data-color="#007aff" style="background:#007aff"></div>
+      <div class="pswatch" data-color="#34c759" style="background:#34c759"></div>
+      <div class="pswatch" data-color="#ff9500" style="background:#ff9500"></div>
+      <div class="pswatch" data-color="#8863e8" style="background:#8863e8"></div>
+    </div>
+    <div class="pdivider"></div>
+    <div class="pgroup" id="sizes">
+      <button class="psize active" data-size="thin" data-px="3" title="Fine"><span></span></button>
+      <button class="psize" data-size="med" data-px="5.5" title="Medium"><span></span></button>
+      <button class="psize" data-size="thick" data-px="10" title="Broad"><span></span></button>
+    </div>
+    <div class="pdivider"></div>
+    <div class="pgroup">
+      <button class="ptool" id="undoBtn" title="Undo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 016 6v1"/></svg>
+      </button>
+      <button class="ptool" id="trashBtn" title="Delete entry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M6 6l1 14a2 2 0 002 2h6a2 2 0 002-2l1-14"/></svg>
+      </button>
+    </div>
+    <div class="pdivider"></div>
+    <div class="ptoggle on" id="pencilOnly" title="Only Apple Pencil draws">
+      <div class="pill"></div>
+      <div>Pencil<br>only</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="confirmSheet">
+  <div class="action-card">
+    <div class="grp">
+      <div class="title-row">This entry will be deleted from your journal.</div>
+      <button class="destructive" id="confirmDelete">Delete Entry</button>
+    </div>
+    <div class="grp">
+      <button class="cancel" id="cancelDelete">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const paper = document.getElementById('paperCanvas');
+  const ink   = document.getElementById('inkCanvas');
+  const pctx  = paper.getContext('2d');
+  const ictx  = ink.getContext('2d');
+  const hint  = document.getElementById('hint');
+  const toast = document.getElementById('toast');
+  const home  = document.getElementById('home');
+  const editor= document.getElementById('editor');
+  const cardList = document.getElementById('cardList');
+
+  const DPR = Math.min(window.devicePixelRatio || 1, 3);
+  const REF_W = 1000;
+
+  let tool = 'pen';
+  let color = '#111114';
+  let baseSize = 3;
+  let pencilOnly = true;
+  let strokes = [];
+  let current = null;
+  let drawing = false;
+  let activePointer = null;
+  let curDate = todayKey();
+  let saveTimer = null;
+  let toastTimer = null;
+  let editorOpen = false;
+  let lastStreak = 0;
+  let wroteTodayBefore = false;
+
+  function todayKey(){
+    const d = new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function keyToDate(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d); }
+  function fmt(k){
+    const d = keyToDate(k);
+    const now = new Date();
+    const today = todayKey();
+    const yest = (()=>{const t=new Date(now);t.setDate(t.getDate()-1);
+      return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');})();
+    const w = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+    const m = ['January','February','March','April','May','June','July','August','September','October','November','December'][d.getMonth()];
+    const ms = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+    let rel = w;
+    if(k===today) rel = 'Today';
+    else if(k===yest) rel = 'Yesterday';
+    return {
+      rel,
+      long: w+', '+m+' '+d.getDate(),
+      short: ms+' '+d.getDate()+', '+d.getFullYear(),
+      dow: w
+    };
+  }
+
+  /* ---------- canvas ---------- */
+  function resize(){
+    const r = ink.getBoundingClientRect();
+    if(r.width < 2 || r.height < 2) return;
+    for(const c of [paper,ink]){
+      c.width  = Math.round(r.width * DPR);
+      c.height = Math.round(r.height * DPR);
+    }
+    drawPaper();
+    redraw();
+  }
+
+  function drawPaper(){
+    const w = paper.width, h = paper.height;
+    pctx.clearRect(0,0,w,h);
+    pctx.fillStyle = '#ffffff';
+    pctx.fillRect(0,0,w,h);
+  }
+
+  function scale(){ return ink.width / REF_W; }
+
+  function strokeStyle(s){
+    if(s.tool==='marker') return {comp:'multiply', alpha:.35, cap:'butt', widthMul:5.5, pressure:false, color:s.color};
+    if(s.tool==='pencil') return {comp:'source-over', alpha:.85, cap:'round', widthMul:1, pressure:true, color:s.color};
+    if(s.tool==='eraser') return {comp:'destination-out', alpha:1, cap:'round', widthMul:7, pressure:false, color:'#000'};
+    return {comp:'source-over', alpha:1, cap:'round', widthMul:1.15, pressure:true, color:s.color};
+  }
+
+  // pressure curve: even a light touch draws a solid line,
+  // pressing harder adds weight on top
+  function pressureWidth(p){ return .65 + p * .75; }
+
+  function paintStroke(ctx, s, k){
+    const st = strokeStyle(s);
+    ctx.save();
+    ctx.globalCompositeOperation = st.comp;
+    ctx.globalAlpha = st.alpha;
+    ctx.strokeStyle = st.color;
+    ctx.lineCap = st.cap;
+    ctx.lineJoin = 'round';
+    const pts = s.pts;
+    if(pts.length === 1){
+      const p = pts[0];
+      const r = s.size * st.widthMul * (st.pressure ? pressureWidth(p.p) : 1) * k / 2;
+      ctx.fillStyle = st.color;
+      ctx.beginPath();
+      ctx.arc(p.x*k, p.y*k, Math.max(r,1), 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+    for(let i=1;i<pts.length;i++){
+      const a = pts[i-1], b = pts[i];
+      const pr = st.pressure ? pressureWidth((a.p+b.p)/2) : 1;
+      ctx.lineWidth = Math.max(s.size * st.widthMul * pr * k, 1.2);
+      ctx.beginPath();
+      ctx.moveTo(a.x*k, a.y*k);
+      ctx.lineTo(b.x*k, b.y*k);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawSegment(s, a, b){
+    const st = strokeStyle(s);
+    const k = scale();
+    ictx.save();
+    ictx.globalCompositeOperation = st.comp;
+    ictx.globalAlpha = st.alpha;
+    ictx.strokeStyle = st.color;
+    ictx.lineCap = st.cap;
+    ictx.lineJoin = 'round';
+    const pr = st.pressure ? pressureWidth((a.p+b.p)/2) : 1;
+    ictx.lineWidth = Math.max(s.size * st.widthMul * pr * k, 1.2);
+    ictx.beginPath();
+    ictx.moveTo(a.x*k, a.y*k);
+    ictx.lineTo(b.x*k, b.y*k);
+    ictx.stroke();
+    ictx.restore();
+  }
+
+  function redraw(){
+    ictx.clearRect(0,0,ink.width,ink.height);
+    const k = scale();
+    for(const s of strokes) paintStroke(ictx, s, k);
+    hint.classList.toggle('hidden', strokes.length>0);
+  }
+
+  /* ---------- input ---------- */
+  function toLogical(e){
+    const r = ink.getBoundingClientRect();
+    const k = REF_W / r.width;
+    return {
+      x: +((e.clientX - r.left) * k).toFixed(1),
+      y: +((e.clientY - r.top) * k).toFixed(1),
+      p: +(e.pressure && e.pressure>0 ? e.pressure : .5).toFixed(2)
+    };
+  }
+  function allowed(e){
+    if(e.pointerType === 'pen' || e.pointerType === 'mouse') return true;
+    return !pencilOnly;
+  }
+  ink.addEventListener('pointerdown', e => {
+    if(!allowed(e)) return;
+    e.preventDefault();
+    if(drawing) return;
+    drawing = true;
+    activePointer = e.pointerId;
+    ink.setPointerCapture(e.pointerId);
+    current = {tool, color, size: baseSize, pts:[toLogical(e)]};
+    hint.classList.add('hidden');
+  });
+  ink.addEventListener('pointermove', e => {
+    if(!drawing || e.pointerId !== activePointer) return;
+    e.preventDefault();
+    const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for(const ev of events){
+      const pt = toLogical(ev);
+      const last = current.pts[current.pts.length-1];
+      const dx = pt.x-last.x, dy = pt.y-last.y;
+      if(dx*dx+dy*dy < 1.2) continue;
+      current.pts.push(pt);
+      drawSegment(current, last, pt);
+    }
+  });
+  function endStroke(e){
+    if(!drawing || (e && e.pointerId !== activePointer)) return;
+    drawing = false;
+    activePointer = null;
+    if(current && current.pts.length){
+      strokes.push(current);
+      if(current.tool==='marker' || current.tool==='eraser') redraw();
+      scheduleSave();
+    }
+    current = null;
+  }
+  ink.addEventListener('pointerup', endStroke);
+  ink.addEventListener('pointercancel', endStroke);
+  ink.addEventListener('pointerleave', e => { if(drawing && e.pointerId===activePointer) endStroke(e); });
+  ink.addEventListener('touchstart', e => e.preventDefault(), {passive:false});
+
+  /* ---------- storage ---------- */
+  const KEY = d => 'diary:'+d;
+
+  async function loadPage(dateKey){
+    strokes = [];
+    try{
+      const res = await window.storage.get(KEY(dateKey));
+      if(res && res.value){
+        const data = JSON.parse(res.value);
+        strokes = data.strokes || [];
+      }
+    }catch(err){ /* new entry */ }
+    drawPaper();
+    redraw();
+  }
+  function scheduleSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(savePage, 800);
+  }
+  async function savePage(){
+    try{
+      if(strokes.length === 0){
+        try{ await window.storage.delete(KEY(curDate)); }catch(_){}
+      }else{
+        await window.storage.set(KEY(curDate), JSON.stringify({strokes}));
+      }
+    }catch(err){
+      showToast('Couldn\u2019t save this entry');
+    }
+  }
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>toast.classList.remove('show'), 1800);
+  }
+
+  /* ---------- home list ---------- */
+  async function renderHome(){
+    let keys = [];
+    try{
+      const res = await window.storage.list('diary:');
+      keys = (res && res.keys ? res.keys : []).map(k => typeof k==='string'?k:k.key).filter(Boolean);
+    }catch(err){ keys = []; }
+    const dates = keys.map(k=>k.replace('diary:','')).sort().reverse();
+
+    renderStreak(dates);
+    cardList.innerHTML = '';
+    if(dates.length === 0){
+      cardList.innerHTML =
+        '<div class="empty-state">'+
+        '<div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V4a2 2 0 00-2-2H6.5A2.5 2.5 0 004 4.5v15z"/><path d="M4 19.5A2.5 2.5 0 006.5 22H20v-5"/></svg></div>'+
+        '<h2>Start Your Diary</h2>'+
+        '<p>Capture today in your own handwriting.<br>Tap the plus button to begin.</p>'+
+        '</div>';
+      return;
+    }
+
+    const today = todayKey();
+    const thisWeek = [], earlier = [];
+    for(const d of dates){
+      const diff = (keyToDate(today) - keyToDate(d)) / 86400000;
+      (diff < 7 ? thisWeek : earlier).push(d);
+    }
+
+    let delay = 0;
+    const addSection = (label, arr) => {
+      if(!arr.length) return;
+      const lab = document.createElement('div');
+      lab.className = 'section-label';
+      lab.textContent = label;
+      cardList.appendChild(lab);
+      for(const dk of arr){
+        const f = fmt(dk);
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.animationDelay = (delay+=0.04)+'s';
+        const cv = document.createElement('canvas');
+        cv.className = 'thumb';
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.innerHTML = '<div class="title">'+f.rel+'</div><div class="sub">'+f.short+'</div>';
+        card.appendChild(cv);
+        card.appendChild(meta);
+        card.addEventListener('click', ()=>openEditor(dk));
+        cardList.appendChild(card);
+        drawThumb(cv, dk);
+      }
+    };
+    addSection('This Week', thisWeek);
+    addSection('Earlier', earlier);
+  }
+
+  async function drawThumb(cv, dateKey){
+    const w = cv.clientWidth || cv.parentElement.clientWidth || 300;
+    const h = 130;
+    cv.width = w * DPR; cv.height = h * DPR;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#fff';
+    c.fillRect(0,0,cv.width,cv.height);
+    try{
+      const res = await window.storage.get(KEY(dateKey));
+      if(!res || !res.value) return;
+      const data = JSON.parse(res.value);
+      const st = data.strokes || [];
+      if(!st.length) return;
+      // fit strokes: assume page aspect similar; crop to top portion
+      const k = cv.width / REF_W;
+      c.save();
+      for(const s of st) paintStroke(c, s, k);
+      c.restore();
+    }catch(err){ /* blank thumb */ }
+  }
+
+  /* ---------- streak ---------- */
+  function dayKeyFromDate(d){
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function computeStreak(dates){
+    const have = new Set(dates);
+    const today = todayKey();
+    const wroteToday = have.has(today);
+    // streak counts back from today, or from yesterday if today isn't written yet
+    let cursor = new Date();
+    if(!wroteToday) cursor.setDate(cursor.getDate()-1);
+    let streak = 0;
+    while(have.has(dayKeyFromDate(cursor))){
+      streak++;
+      cursor.setDate(cursor.getDate()-1);
+    }
+    return {streak, wroteToday};
+  }
+  function renderStreak(dates){
+    const el = document.getElementById('streakBanner');
+    const {streak, wroteToday} = computeStreak(dates);
+    lastStreak = streak;
+    if(wroteToday) wroteTodayBefore = true;
+    const flameSvg = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2c.6 3.2-.8 5-2.4 6.6C7.9 10.3 6 12.2 6 15.2 6 18.9 8.9 22 12.4 22c3.4 0 6.1-2.8 6.1-6.4 0-4.6-3.3-6.3-3.7-9.3-1 .8-1.6 2-1.4 3.4-1.6-1.3-2-4.5-1.4-7.7z"/></svg>';
+    if(streak === 0 && !wroteToday){
+      el.innerHTML =
+        '<div class="streak-banner cold">'+
+          '<div class="flame">'+flameSvg+'</div>'+
+          '<div class="txt"><div class="big">Start a streak</div>'+
+          '<div class="small">Journal today to light the flame</div></div>'+
+        '</div>';
+      return;
+    }
+    const sub = wroteToday
+      ? 'You\u2019ve journaled today \u2014 keep it up!'
+      : 'Journal today to keep it going';
+    const badge = wroteToday
+      ? '<div class="badge">Done today</div>'
+      : '<div class="badge warn">Not yet today</div>';
+    el.innerHTML =
+      '<div class="streak-banner">'+
+        '<div class="flame">'+flameSvg+'</div>'+
+        '<div class="txt"><div class="big">'+streak+'-day streak</div>'+
+        '<div class="small">'+sub+'</div></div>'+
+        badge+
+      '</div>';
+  }
+
+  /* ---------- navigation ---------- */
+  const navDate = document.getElementById('navDate');
+  const navSub  = document.getElementById('navSub');
+
+  function openEditor(dateKey){
+    curDate = dateKey;
+    const f = fmt(dateKey);
+    navDate.textContent = f.rel;
+    navSub.textContent = f.short;
+    editor.classList.add('open');
+    home.classList.add('pushed');
+    editorOpen = true;
+    requestAnimationFrame(()=>{
+      setTimeout(()=>{ resize(); loadPage(curDate); }, 340);
+    });
+  }
+  async function closeEditor(){
+    clearTimeout(saveTimer);
+    await savePage();
+    editor.classList.remove('open');
+    home.classList.remove('pushed');
+    editorOpen = false;
+    const justWroteToday = curDate === todayKey() && strokes.length > 0 && !wroteTodayBefore;
+    await renderHome();
+    if(justWroteToday){
+      wroteTodayBefore = true;
+      const n = lastStreak;
+      showToast(n > 1 ? '\uD83D\uDD25 ' + n + '-day streak!' : '\uD83D\uDD25 Streak started!');
+    }
+  }
+  document.getElementById('fabBtn').addEventListener('click', ()=>openEditor(todayKey()));
+  document.getElementById('backBtn').addEventListener('click', closeEditor);
+  document.getElementById('doneBtn').addEventListener('click', closeEditor);
+
+  /* ---------- palette ---------- */
+  document.getElementById('tools').addEventListener('click', e => {
+    const b = e.target.closest('.ptool'); if(!b) return;
+    tool = b.dataset.tool;
+    document.querySelectorAll('#tools .ptool').forEach(t=>t.classList.toggle('active', t===b));
+  });
+  document.getElementById('colors').addEventListener('click', e => {
+    const s = e.target.closest('.pswatch'); if(!s) return;
+    color = s.dataset.color;
+    document.querySelectorAll('.pswatch').forEach(x=>x.classList.toggle('active', x===s));
+    if(tool==='eraser'){
+      tool = 'pen';
+      document.querySelectorAll('#tools .ptool').forEach(t=>t.classList.toggle('active', t.dataset.tool==='pen'));
+    }
+  });
+  document.getElementById('sizes').addEventListener('click', e => {
+    const d = e.target.closest('.psize'); if(!d) return;
+    baseSize = parseFloat(d.dataset.px);
+    document.querySelectorAll('.psize').forEach(x=>x.classList.toggle('active', x===d));
+  });
+  document.getElementById('undoBtn').addEventListener('click', ()=>{
+    if(strokes.length){ strokes.pop(); redraw(); scheduleSave(); }
+  });
+
+  const confirmSheet = document.getElementById('confirmSheet');
+  document.getElementById('trashBtn').addEventListener('click', ()=>{
+    if(!strokes.length) return;
+    confirmSheet.classList.add('open');
+  });
+  document.getElementById('cancelDelete').addEventListener('click', ()=>confirmSheet.classList.remove('open'));
+  confirmSheet.addEventListener('click', e => { if(e.target===confirmSheet) confirmSheet.classList.remove('open'); });
+  document.getElementById('confirmDelete').addEventListener('click', async ()=>{
+    confirmSheet.classList.remove('open');
+    strokes = [];
+    redraw();
+    clearTimeout(saveTimer);
+    await savePage();
+    showToast('Entry deleted');
+  });
+
+  const pencilToggle = document.getElementById('pencilOnly');
+  pencilToggle.addEventListener('click', ()=>{
+    pencilOnly = !pencilOnly;
+    pencilToggle.classList.toggle('on', pencilOnly);
+    showToast(pencilOnly ? 'Only Apple Pencil draws' : 'Finger drawing on');
+  });
+
+  window.addEventListener('visibilitychange', ()=>{ if(document.hidden && editorOpen) savePage(); });
+  window.addEventListener('resize', ()=>{ if(editorOpen) resize(); });
+
+  renderHome();
+})();
+</script>
+</body>
+</html>
